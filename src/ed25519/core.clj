@@ -178,3 +178,56 @@
         v   (doto (Signature/getInstance "Ed25519") (.initVerify (public-from-raw (pubkey-from-seed seed))))
         _   (.update v msg)]
     (.verify v sig)))
+
+;; ── base58 decode (for did:key parsing) ───────────────────────────────────────
+(def ^:private b58-idx
+  (into {} (map-indexed (fn [i c] [c i]) b58-alphabet)))
+
+(defn b58-decode
+  "base58btc (Bitcoin alphabet) decode → byte-array. Leading '1's → leading 0x00."
+  ^bytes [^String s]
+  (let [n (reduce (fn [acc c]
+                    (.add (.multiply acc (biginteger 58))
+                          (biginteger (int (or (b58-idx c)
+                                               (throw (ex-info "bad base58 char" {:c c})))))))
+                  BigInteger/ZERO (seq s))
+        body (if (zero? (.signum n))
+               (byte-array 0)
+               (let [ba (.toByteArray n)]
+                 (if (and (> (count ba) 1) (zero? (aget ba 0))) (byte-array (rest (seq ba))) ba)))
+        leading (count (take-while #(= \1 %) s))]
+    (byte-array (concat (repeat leading (byte 0)) (seq body)))))
+
+;; ── did:key parsing ───────────────────────────────────────────────────────────
+(defn did-key->pubkey
+  "Parse a did:key:z6Mk… (Ed25519) → raw 32-byte public key. Verifies the
+   multicodec 0xed01 prefix; throws on a non-Ed25519 did:key."
+  ^bytes [^String did]
+  (when-not (str/starts-with? did "did:key:z")
+    (throw (ex-info "expected a did:key:z… multibase did" {:did did})))
+  (let [bytes (b58-decode (subs did (count "did:key:z")))]
+    (when-not (and (>= (count bytes) 2)
+                   (= 0xed (bit-and (aget bytes 0) 0xff))
+                   (= 0x01 (bit-and (aget bytes 1) 0xff)))
+      (throw (ex-info "not an Ed25519 did:key (expected 0xed01 multicodec)" {:did did})))
+    (byte-array (drop 2 (seq bytes)))))
+
+;; ── sign / verify (JCA Ed25519; the seed/pubkey-bytes facing API) ─────────────
+(defn sign
+  "Sign `msg` (bytes) with the raw 32-byte seed → 64-byte Ed25519 signature."
+  ^bytes [^bytes seed ^bytes msg]
+  (let [s (doto (Signature/getInstance "Ed25519") (.initSign (private-from-seed seed)))]
+    (.update s msg)
+    (.sign s)))
+
+(defn verify
+  "Verify a 64-byte Ed25519 signature of `msg` under a raw 32-byte public key."
+  [^bytes pub ^bytes msg ^bytes sig]
+  (let [v (doto (Signature/getInstance "Ed25519") (.initVerify (public-from-raw pub)))]
+    (.update v msg)
+    (.verify v sig)))
+
+(defn verify-did
+  "Verify a signature where the signer is identified by a did:key:z… (Ed25519)."
+  [^String did ^bytes msg ^bytes sig]
+  (verify (did-key->pubkey did) msg sig))

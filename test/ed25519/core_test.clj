@@ -54,3 +54,28 @@
 (deftest hex-roundtrip
   (let [b (byte-array (map unchecked-byte (range -128 0)))]
     (is (= (seq b) (seq (ed/unhex (ed/hexify b)))))))
+
+;; ── sign / verify / did:key parse (added) ─────────────────────────────────────
+(deftest sign-verify-roundtrip
+  (let [g (java.security.KeyPairGenerator/getInstance "Ed25519")]
+    (dotimes [_ 8]
+      (let [seed (byte-array (take-last 32 (seq (.getEncoded (.getPrivate (.generateKeyPair g))))))
+            pub  (ed/pubkey-from-seed seed)
+            msg  (.getBytes "sign me" "UTF-8")
+            sig  (ed/sign seed msg)]
+        (is (= 64 (count sig)))
+        (is (true? (ed/verify pub msg sig)))
+        (is (true? (ed/verify-did (ed/did-key-from-seed seed) msg sig)))
+        (is (false? (ed/verify pub (.getBytes "tampered" "UTF-8") sig)))))))
+
+(deftest did-key-parse-roundtrip
+  (let [seed (ed/unhex vec-seed)
+        pub  (ed/pubkey-from-seed seed)
+        did  (ed/did-key-from-pub pub)]
+    (is (= (seq pub) (seq (ed/did-key->pubkey did))) "did:key → pubkey is the inverse of pubkey → did:key")
+    (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey "did:key:zNotEd25519")))
+    (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey "not-a-did")))))
+
+(deftest base58-encode-decode-inverse
+  (let [b (byte-array (map unchecked-byte [0 0 1 2 3 250 255]))]
+    (is (= (seq b) (seq (ed/b58-decode (ed/b58 b)))))))

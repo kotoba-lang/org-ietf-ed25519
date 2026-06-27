@@ -38,6 +38,12 @@ io.github.com-junkawasaki/ed25519-clj {:git/sha "<sha>"}
 (ed/did-key-from-seed seed-bytes)       ;=> "did:key:z6Mk…"
 (ed/did-key-from-seed-hex "9d61b1…")    ;=> "did:key:z6Mk…"
 
+;; sign / verify / parse
+(ed/sign seed-bytes msg-bytes)          ;=> ^bytes (64)  Ed25519 signature
+(ed/verify pub-bytes msg-bytes sig)     ;=> true
+(ed/verify-did "did:key:z6Mk…" msg sig) ;=> true   (signer identified by did:key)
+(ed/did-key->pubkey "did:key:z6Mk…")    ;=> ^bytes (32)  the inverse of did-key-from-pub
+
 ;; vector-free correctness check: sign with PKCS8(seed), verify under the derived pubkey
 (ed/verify-derivation seed-bytes)       ;=> true
 ```
