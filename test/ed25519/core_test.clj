@@ -1,0 +1,56 @@
+(ns ed25519.core-test
+  "Correctness of the pure-Clojure Ed25519 public-key derivation.
+
+   Two independent oracles, neither relying on a memorized RFC table:
+   1. JCA-oracle — generate keypairs with the JVM's own RFC-8032 Ed25519 provider,
+      extract the seed (PKCS8 tail) + pubkey (SPKI tail), and assert our derivation
+      reproduces the provider's pubkey byte-for-byte. This pins us to the platform's
+      conformant implementation across many random keys.
+   2. Fixed regression vector — one (seed → pubkey) pair, itself JCA-verified, so a
+      future refactor that breaks determinism fails even if the oracle were skipped."
+  (:require [clojure.test :refer [deftest is]]
+            [ed25519.core :as ed])
+  (:import (java.security KeyPairGenerator)))
+
+;; ── 1. JCA oracle (the authoritative check) ───────────────────────────────────
+(deftest derivation-matches-jca-provider
+  (let [g (KeyPairGenerator/getInstance "Ed25519")]
+    (dotimes [_ 16]
+      (let [kp    (.generateKeyPair g)
+            seed  (byte-array (take-last 32 (seq (.getEncoded (.getPrivate kp)))))
+            jca   (byte-array (take-last 32 (seq (.getEncoded (.getPublic kp)))))
+            ours  (ed/pubkey-from-seed seed)]
+        (is (= (ed/hexify jca) (ed/hexify ours))
+            "derived pubkey must equal the JCA provider's pubkey for the same seed")))))
+
+(deftest jca-self-check-passes
+  (let [g (KeyPairGenerator/getInstance "Ed25519")]
+    (dotimes [_ 8]
+      (let [seed (byte-array (take-last 32 (seq (.getEncoded (.getPrivate (.generateKeyPair g))))))]
+        (is (true? (ed/verify-derivation seed)))))))
+
+;; ── 2. Fixed regression vector (JCA-verified pair) ────────────────────────────
+(def ^:private vec-seed "9d61b19deffeebc52cd2c8f4d2b2f8c3127bf48abf57df622da6a55f6e2e2a3a")
+(def ^:private vec-pub  "4bafa3904f4d71a6be4b76d3ba01a3e71e27df9242624a157c22edbe81bfef5b")
+
+(deftest fixed-vector
+  (is (= vec-pub (ed/seed-hex->pubkey-hex vec-seed)))
+  ;; and the pair is self-consistent under JCA (this is HOW the vector was minted)
+  (is (true? (ed/verify-derivation (ed/unhex vec-seed)))))
+
+;; ── did:key shape ─────────────────────────────────────────────────────────────
+(deftest did-key-shape
+  (let [did (ed/did-key-from-seed-hex vec-seed)]
+    (is (clojure.string/starts-with? did "did:key:z6Mk"))
+    ;; multicodec 0xed01 + 32-byte ed25519 pubkey → 48-char base58 body (z + 47..48)
+    (is (<= 55 (count did) 58))))
+
+;; ── input validation ──────────────────────────────────────────────────────────
+(deftest seed-must-be-32-bytes
+  (is (thrown? clojure.lang.ExceptionInfo (ed/pubkey-from-seed (byte-array 31))))
+  (is (thrown? clojure.lang.ExceptionInfo (ed/pubkey-from-seed (byte-array 33)))))
+
+;; ── encodings round-trip ──────────────────────────────────────────────────────
+(deftest hex-roundtrip
+  (let [b (byte-array (map unchecked-byte (range -128 0)))]
+    (is (= (seq b) (seq (ed/unhex (ed/hexify b)))))))
