@@ -1,5 +1,7 @@
 # ed25519-clj
 
+[![CI](https://github.com/kotoba-lang/ed25519/actions/workflows/ci.yml/badge.svg)](https://github.com/kotoba-lang/ed25519/actions/workflows/ci.yml)
+
 **Recover an Ed25519 public key (and its `did:key`) from a raw 32-byte seed — in
 pure Clojure, no BouncyCastle, no native code, babashka-friendly.**
 
