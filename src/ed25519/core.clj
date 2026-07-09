@@ -221,7 +221,7 @@
   (when-not (str/starts-with? did "did:key:z")
     (throw (ex-info "expected a did:key:z… multibase did" {:did did})))
   (let [bytes (b58-decode (subs did (count "did:key:z")))]
-    (when-not (and (>= (count bytes) 2)
+    (when-not (and (= 34 (count bytes))
                    (= 0xed (bit-and (aget bytes 0) 0xff))
                    (= 0x01 (bit-and (aget bytes 1) 0xff)))
       (throw (ex-info "not an Ed25519 did:key (expected 0xed01 multicodec)" {:did did})))
