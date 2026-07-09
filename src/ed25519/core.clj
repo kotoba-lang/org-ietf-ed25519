@@ -111,6 +111,21 @@
 
 (defn unhex ^bytes [^String s]
   (let [s (str/replace s #"\s" "")]
+    (when (odd? (count s))
+      ;; `(partition 2 s)` on an odd-length string silently drops the
+      ;; trailing incomplete nibble instead of erroring -- a truncated/
+      ;; malformed hex string (an odd number of hex digits is never valid
+      ;; encoded byte data) must fail loudly, not quietly decode a
+      ;; shorter-than-intended byte array. Concretely dangerous here: a
+      ;; 65-char (one-too-many) seed-hex silently truncates to exactly 32
+      ;; bytes -- pubkey-from-seed's OWN `(not= 32 (count seed))` guard
+      ;; then can't catch it, since the truncated result happens to be
+      ;; the "right" length, just the WRONG bytes -- silently deriving a
+      ;; pubkey/did:key from truncated seed material with no error
+      ;; anywhere. Matches the identical fix already landed in this
+      ;; ecosystem's multiformats.core/unhex (same bug class, same fn
+      ;; name, independently hand-rolled here).
+      (throw (ex-info "unhex: odd-length hex string" {:s s})))
     (byte-array (map (fn [[a b]] (unchecked-byte (Integer/parseInt (str a b) 16)))
                      (partition 2 s)))))
 
