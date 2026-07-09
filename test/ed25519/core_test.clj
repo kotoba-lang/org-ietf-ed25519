@@ -85,6 +85,22 @@
     (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey "did:key:zNotEd25519")))
     (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey "not-a-did")))))
 
+(deftest did-key-rejects-wrong-length-multicodec-payload
+  ;; An Ed25519 did:key multicodec payload is always exactly 34 bytes
+  ;; (2-byte 0xed01 prefix + 32-byte pubkey). did-key->pubkey must reject
+  ;; a correctly-prefixed payload of any other length -- not silently
+  ;; return whatever bytes happen to follow the prefix.
+  (testing "prefix with zero bytes of key material must not be accepted"
+    (let [truncated-did (str "did:key:z" (ed/b58 (byte-array [(unchecked-byte 0xed) (unchecked-byte 0x01)])))]
+      (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey truncated-did)))))
+  (testing "a valid payload with trailing garbage bytes must not be accepted"
+    (let [pub (ed/pubkey-from-seed (ed/unhex vec-seed))
+          oversized (byte-array (concat [(unchecked-byte 0xed) (unchecked-byte 0x01)]
+                                        (seq pub)
+                                        [(unchecked-byte 0xaa) (unchecked-byte 0xbb)]))
+          oversized-did (str "did:key:z" (ed/b58 oversized))]
+      (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey oversized-did))))))
+
 (deftest base58-encode-decode-inverse
   (let [b (byte-array (map unchecked-byte [0 0 1 2 3 250 255]))]
     (is (= (seq b) (seq (ed/b58-decode (ed/b58 b)))))))
