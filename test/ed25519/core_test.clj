@@ -8,7 +8,7 @@
       conformant implementation across many random keys.
    2. Fixed regression vector — one (seed → pubkey) pair, itself JCA-verified, so a
       future refactor that breaks determinism fails even if the oracle were skipped."
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [ed25519.core :as ed])
   (:import (java.security KeyPairGenerator)))
 
@@ -49,6 +49,15 @@
 (deftest seed-must-be-32-bytes
   (is (thrown? clojure.lang.ExceptionInfo (ed/pubkey-from-seed (byte-array 31))))
   (is (thrown? clojure.lang.ExceptionInfo (ed/pubkey-from-seed (byte-array 33)))))
+
+(deftest unhex-rejects-odd-length-hex-instead-of-silently-truncating
+  (is (thrown? clojure.lang.ExceptionInfo (ed/unhex "abc")))
+  (testing "the concretely dangerous case: a 65-char (one-too-many) seed-hex
+            would otherwise silently truncate to exactly 32 bytes -- the
+            RIGHT length, the WRONG bytes -- evading pubkey-from-seed's
+            own 32-byte length guard entirely"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (ed/unhex (str vec-seed "0"))))))
 
 ;; ── encodings round-trip ──────────────────────────────────────────────────────
 (deftest hex-roundtrip
