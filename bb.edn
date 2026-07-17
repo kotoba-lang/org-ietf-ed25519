@@ -1,8 +1,0 @@
-{:paths ["src" "test"]
- :tasks
- {test
-  {:doc "Run the ed25519.core test suite (JCA-oracle + fixed vector; no network)."
-   :task (do (require 'clojure.test 'ed25519.core-test)
-             (let [r (clojure.test/run-tests 'ed25519.core-test)]
-               (when (pos? (+ (:fail r) (:error r)))
-                 (System/exit 1))))}}}
