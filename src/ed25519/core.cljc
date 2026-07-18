@@ -275,7 +275,7 @@
   "base58btc (Bitcoin alphabet) decode → byte-array. Leading '1's → leading 0x00."
   [^String s]
   #?(:clj
-     (let [n (reduce (fn [acc c]
+     (let [^BigInteger n (reduce (fn [^BigInteger acc c]
                        (.add (.multiply acc (biginteger 58))
                              (biginteger (int (or (b58-idx c)
                                                   (throw (ex-info "bad base58 char" {:c c})))))))
