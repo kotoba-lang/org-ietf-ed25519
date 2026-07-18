@@ -32,7 +32,7 @@
 (ns ed25519.core
   (:require [clojure.string :as str]
             #?(:cljs ["crypto" :as ncrypto]))
-  #?(:clj (:import (java.security MessageDigest KeyFactory Signature)
+  #?(:clj (:import (java.security MessageDigest KeyFactory PrivateKey PublicKey Signature)
                    (java.security.spec PKCS8EncodedKeySpec X509EncodedKeySpec))))
 
 ;; ── platform byte helpers ─────────────────────────────────────────────────────
@@ -207,10 +207,11 @@
   "base58btc (Bitcoin alphabet) encode."
   ^String [b]
   #?(:clj
-     (let [n (BigInteger. 1 b) fifty8 (biginteger 58)]
+     (let [n (BigInteger. 1 ^bytes b) fifty8 (biginteger 58)]
        (loop [n n acc ""]
          (if (pos? (.signum n))
-           (recur (.divide n fifty8) (str (.charAt b58-alphabet (.intValue (.mod n fifty8))) acc))
+           (recur (.divide n fifty8)
+                  (str (.charAt ^String b58-alphabet (.intValue (.mod n fifty8))) acc))
            (str (apply str (repeat (count (take-while zero? (seq b))) \1)) acc))))
      :cljs
      ;; classic byte-vector long division -- no BigInt (nbb's SCI has no js*,
@@ -259,7 +260,8 @@
            s   (doto (Signature/getInstance "Ed25519") (.initSign (private-from-seed seed)))
            _   (.update s msg)
            sig (.sign s)
-           v   (doto (Signature/getInstance "Ed25519") (.initVerify (public-from-raw (pubkey-from-seed seed))))
+           v   (doto (Signature/getInstance "Ed25519")
+                 (.initVerify ^PublicKey (public-from-raw (pubkey-from-seed seed))))
            _   (.update v msg)]
        (.verify v sig))
      :cljs
@@ -326,7 +328,8 @@
   "Sign `msg` (bytes) with the raw 32-byte seed → 64-byte Ed25519 signature."
   [seed msg]
   #?(:clj
-     (let [s (doto (Signature/getInstance "Ed25519") (.initSign (private-from-seed seed)))]
+     (let [s (doto (Signature/getInstance "Ed25519")
+               (.initSign ^PrivateKey (private-from-seed seed)))]
        (.update s ^bytes msg)
        (.sign s))
      :cljs
@@ -336,7 +339,8 @@
   "Verify a 64-byte Ed25519 signature of `msg` under a raw 32-byte public key."
   [pub msg sig]
   #?(:clj
-     (let [v (doto (Signature/getInstance "Ed25519") (.initVerify (public-from-raw pub)))]
+     (let [v (doto (Signature/getInstance "Ed25519")
+               (.initVerify ^PublicKey (public-from-raw pub)))]
        (.update v ^bytes msg)
        (.verify v ^bytes sig))
      :cljs
