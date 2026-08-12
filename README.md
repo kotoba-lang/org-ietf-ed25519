@@ -55,7 +55,7 @@ key objects from raw bytes), `hexify` / `unhex`, `b58`, and the field constant `
 
 ## Correctness
 
-`bb test` (or `clojure -X:test`) runs two independent oracles, neither relying on a
+`clojure -M:test` runs two independent oracles, neither relying on a
 memorized RFC table:
 
 1. **JCA oracle** — generate keypairs with the JVM's own conformant RFC-8032
@@ -65,10 +65,22 @@ memorized RFC table:
    refactor that breaks determinism fails loudly.
 
 ```
-$ bb test
-Ran 6 tests containing 31 assertions.
+$ clojure -M:test
+Ran 11 tests containing 71 assertions.
 0 failures, 0 errors.
 ```
+
+Two invocations this section used to name are **unavailable**, and neither is
+replaced by the other:
+
+- `bb test` — babashka was retired as this workspace's script host
+  (ADR-2607173000) and the conversion left `scripts/tasks.edn` empty, so it has
+  had no runnable path since 2026-07-17 (ADR-2608131600). The recovered
+  babashka body is in `scripts/tasks-complex.edn`.
+- `clojure -X:test` — the `:test` alias supplies `:main-opts`, not `:exec-fn`,
+  so `-X` exits with "No function found on command line or in :exec-fn". Use
+  `-M:test`. (Both measured 2026-08-13; the transcript above is the real
+  `-M:test` output, replacing a stale 6-test/31-assertion one.)
 
 ## Why "no BouncyCastle"
 
