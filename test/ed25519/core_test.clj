@@ -8,7 +8,8 @@
       conformant implementation across many random keys.
    2. Fixed regression vector — one (seed → pubkey) pair, itself JCA-verified, so a
       future refactor that breaks determinism fails even if the oracle were skipped."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
             [ed25519.core :as ed])
   (:import (java.security KeyPairGenerator)))
 
@@ -41,7 +42,7 @@
 ;; ── did:key shape ─────────────────────────────────────────────────────────────
 (deftest did-key-shape
   (let [did (ed/did-key-from-seed-hex vec-seed)]
-    (is (clojure.string/starts-with? did "did:key:z6Mk"))
+    (is (str/starts-with? did "did:key:z6Mk"))
     ;; multicodec 0xed01 + 32-byte ed25519 pubkey → 48-char base58 body (z + 47..48)
     (is (<= 55 (count did) 58))))
 

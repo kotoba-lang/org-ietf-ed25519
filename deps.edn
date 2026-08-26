@@ -1,10 +1,29 @@
 {:paths ["src"]
- :deps {}
+ ;; Two first-party leaves, added for RFC 8032 signing. The key-derivation
+ ;; and encoding half of this library still has no dependencies -- it reaches
+ ;; the platform's own SHA-512 through a reader conditional -- but sign and
+ ;; verify need a PORTABLE hash and portable field arithmetic, and neither
+ ;; runtime supplies those.
+ :deps {io.github.kotoba-lang/org-nist-sha2
+        {:git/url "https://github.com/kotoba-lang/org-nist-sha2.git"
+         :git/sha "a6af40bd8855d3faf959171586786f348894537c"}
+        io.github.kotoba-lang/org-ietf-x25519
+        {:git/url "https://github.com/kotoba-lang/org-ietf-x25519.git"
+         :git/sha "8c4e1ae7c6f14e5d015bcb8ca80e965ad808d920"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
          :main-opts ["-m" "cognitect.test-runner"]}
+  ;; The differential oracle. BouncyCastle is test-scoped and never reaches
+  ;; :deps -- it is what this is CHECKED AGAINST. Both -d directories are
+  ;; named, because the runner defaults to `test` alone and would otherwise
+  ;; exit 0 having never loaded the oracle suite.
+  :oracle {:extra-paths ["test" "oracle"]
+           :extra-deps {org.bouncycastle/bcprov-jdk18on {:mvn/version "1.78.1"}
+                        io.github.cognitect-labs/test-runner
+                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+           :main-opts ["-m" "cognitect.test-runner" "-d" "test" "-d" "oracle"]}
        ;; clj-kondo as a Clojars lib (no Homebrew/system install needed).
        :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
          :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test"
