@@ -91,3 +91,81 @@ mathematically, one scalar multiplication. This is ~120 lines of stdlib Clojure.
 ## License
 
 Apache-2.0.
+
+## Signing and verification (RFC 8032)
+
+```clojure
+(require '[ed25519.sign :as ed])
+
+(def sk (ed/secret-key! seed))       ; 32 random bytes in
+(:public sk)                          ; 32 bytes
+(def sig (ed/sign sk message))        ; 64 bytes
+(ed/verify (:public sk) message sig)  ; true / false
+```
+
+`ed25519.core` — this library's older half — derives keys and encodes them
+(PKCS8, SPKI, did:key, base58) and reaches the **platform's** signer through a
+reader conditional. That is fine where a platform signer exists and is nothing
+at all where one does not. Measured across the 193 repositories in this
+workspace declaring `@noble/curves`, the consumers call `sign` 193 times and
+`verify` 131; neither had a first-party implementation until now.
+
+### What it is and is not
+
+**PureEd25519 only.** RFC 8032 also defines Ed25519ph and Ed25519ctx; both
+take a domain-separation prefix this does not build, and adding them without a
+consumer would ship two untested code paths that look interchangeable with
+this one and are not.
+
+**Signatures are deterministic** — the nonce comes from the private key and
+the message, which is the specification's design and why there is no
+ECDSA-style catastrophe from a repeated one.
+
+**`verify` rejects `S >= L`** (§5.1.7). Without it, `S + L` is a second valid
+signature for the same message and key, which breaks anything treating a
+signature as an identifier — a deduplication key, a transaction id.
+
+**`verify` returns `false` for every rejection**, never throws and never
+distinguishes *which* part of a forgery attempt was wrong.
+
+**Not constant-time.** Timing is a property of machine code and no portable
+Clojure controls it. Where a timing side channel is in scope, use the
+platform's Ed25519 and treat this as the reference it is checked against.
+
+### The constants were derived
+
+`d = -121665/121666`, `sqrt(-1) = 2^((p-1)/4)`, the base point's `y = 4/5`
+with `x` recovered from the curve equation, and `L` itself. All were computed
+with arbitrary precision and checked against the published values before being
+written into the source.
+
+The field arithmetic is `kotoba-lang/org-ietf-x25519`'s — the same
+GF(2^255-19) — rather than a second copy of it. Only the curve is new.
+
+### Verify
+
+```sh
+clojure -M:test     # RFC 8032 §7.1 and the rejection suite
+clojure -M:oracle   # + differential against BouncyCastle
+nbb --classpath "$(clojure -A:test -Spath)" run-tests.cljs
+```
+
+All four RFC 8032 §7.1 vectors, **independently reproduced with BouncyCastle
+1.78.1 before being written here**. Every single-bit flip in a signature (512
+cases) and in a public key (256) rejected. `S + L` rejected. Then a
+differential sweep: 30 key derivations, 140 signatures across message lengths
+that straddle SHA-512's 111-byte padding boundary, 12 cases where
+**BouncyCastle verifies what this signs**, and 12 where **this verifies what
+BouncyCastle signs** — the second direction being what exercises point
+decoding and the square root inside it.
+
+| break | assertions turned red |
+|---|---|
+| scalar reduction truncates instead of flooring | **175** |
+| one limb of `d` | **18** |
+| the `S < L` check removed | **1** |
+
+The ClojureScript run takes about four minutes: 768 verifications at roughly
+two scalar multiplications each, and a scalar multiplication is ~150 ms there.
+The JVM suite is seconds. That is the same not-constant-time, not-fast
+reference implementation the note above describes.
