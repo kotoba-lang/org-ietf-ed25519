@@ -8,7 +8,7 @@
       conformant implementation across many random keys.
    2. Fixed regression vector — one (seed → pubkey) pair, itself JCA-verified, so a
       future refactor that breaks determinism fails even if the oracle were skipped."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             [ed25519.core :as ed])
   (:import (java.security KeyPairGenerator)))

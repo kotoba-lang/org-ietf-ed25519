@@ -30,7 +30,7 @@
 ;;   (ed/did-key-from-seed seed-bytes)  ; "did:key:z6Mk…"
 ;;   (ed/verify-derivation seed-bytes)  ; true   (signer self-check, no vector needed)
 (ns ed25519.core
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             #?(:cljs ["crypto" :as ncrypto]))
   #?(:clj (:import (java.security MessageDigest KeyFactory PrivateKey PublicKey Signature)
                    (java.security.spec PKCS8EncodedKeySpec X509EncodedKeySpec))))
