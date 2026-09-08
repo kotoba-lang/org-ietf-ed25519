@@ -4,7 +4,12 @@
  ;; the platform's own SHA-512 through a reader conditional -- but sign and
  ;; verify need a PORTABLE hash and portable field arithmetic, and neither
  ;; runtime supplies those.
- :deps {io.github.kotoba-lang/org-nist-sha2
+ :deps {
+        ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:
+        ;; tools.deps takes the NEWEST sha it is shown, so without a floor here
+        ;; this repo silently rides whatever a sibling happens to name.
+        io.github.kotoba-lang/text {:git/sha "73bdb13ae7a3d004b44bca08be03a3191157a38f"}
+       io.github.kotoba-lang/org-nist-sha2
         {:git/url "https://github.com/kotoba-lang/org-nist-sha2.git"
          :git/sha "a6af40bd8855d3faf959171586786f348894537c"}
         io.github.kotoba-lang/org-ietf-x25519
