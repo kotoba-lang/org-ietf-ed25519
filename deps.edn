@@ -18,7 +18,7 @@
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
-                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd6605cb6c0efc275e1df1736f6e90d4d73"}}
          :main-opts ["-m" "cognitect.test-runner"]}
   ;; The differential oracle. BouncyCastle is test-scoped and never reaches
   ;; :deps -- it is what this is CHECKED AGAINST. Both -d directories are
@@ -27,7 +27,7 @@
   :oracle {:extra-paths ["test" "oracle"]
            :extra-deps {org.bouncycastle/bcprov-jdk18on {:mvn/version "1.78.1"}
                         io.github.cognitect-labs/test-runner
-                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                        {:git/tag "v0.5.1" :git/sha "dfb30dd6605cb6c0efc275e1df1736f6e90d4d73"}}
            :main-opts ["-m" "cognitect.test-runner" "-d" "test" "-d" "oracle"]}
        ;; clj-kondo as a Clojars lib (no Homebrew/system install needed).
        :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
