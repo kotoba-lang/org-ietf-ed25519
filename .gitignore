@@ -3,3 +3,6 @@ target/
 .clj-kondo/
 .lsp/
 *.class
+
+# nbb dependency cache -- a build artifact, not source
+.nbb/
