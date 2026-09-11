@@ -5,7 +5,7 @@
   A separate source root reached only by the `:oracle` alias: BouncyCastle
   must never become a dependency, because it is what this is CHECKED AGAINST.
 
-      clojure -M:oracle
+      kbb -M:oracle
 
   Four RFC vectors pin four seeds and four short messages. What they leave
   untested is the message-length sweep -- SHA-512's block boundary falls at
