@@ -21,6 +21,7 @@
   The ladder swaps with `x25519.field`'s arithmetic mask, but timing is a
   property of machine code and no portable Clojure controls it. `ed25519.sign`
   says the same where a caller reads it."
+  {:kotoba/export [add base decode encode equal? identity-point point scalar-mult scalar-mult-base]}
   (:require [x25519.field :as f]))
 
 (def ^:private d

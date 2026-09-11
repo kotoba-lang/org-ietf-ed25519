@@ -8,6 +8,7 @@
   exact as a JVM long and as a JavaScript number alike.
 
   This is the shape TweetNaCl uses, for the same reason."
+  {:kotoba/export [less-than-order? mul-add order-bytes reduce reduce32]}
   (:refer-clojure :exclude [reduce]))
 
 (def order-bytes
