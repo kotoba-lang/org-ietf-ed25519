@@ -1,5 +1,5 @@
 ;; ed25519.scalar -- arithmetic mod L = 2^252 + 27742317777372353535851937790883648493
-;; as a pure Kotoba guest (oracle: src/ed25519/scalar.cljc).
+;; as a pure Kotoba guest (oracle: src/ed25519/scalar.cljk).
 ;;
 ;; A scalar is 32 little-endian bytes; the reduction works on BYTE limbs,
 ;; every intermediate under about 2^22, exact as an i64 -- the TweetNaCl

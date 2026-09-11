@@ -147,7 +147,7 @@ GF(2^255-19) — rather than a second copy of it. Only the curve is new.
 ```sh
 clojure -M:test     # RFC 8032 §7.1 and the rejection suite
 clojure -M:oracle   # + differential against BouncyCastle
-nbb --classpath "$(clojure -A:test -Spath)" run-tests.cljs
+nbb --classpath "$(clojure -A:test -Spath)" run-tests.cljk
 ```
 
 All four RFC 8032 §7.1 vectors, **independently reproduced with BouncyCastle
