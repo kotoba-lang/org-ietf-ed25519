@@ -1,5 +1,5 @@
 ;; nbb (ClojureScript-on-Node) smoke for the :cljs branch — run with:
-;;   nbb --classpath src test/nbb_smoke.cljk
+;;   kbb --backend sci --classpath src test/nbb_smoke.cljk
 ;; Exits nonzero on any failure. The signature is compared against the JVM
 ;; implementation's output for the same fixture (Ed25519 is deterministic,
 ;; RFC 8032, so both platforms MUST produce byte-identical signatures --
