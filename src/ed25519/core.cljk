@@ -30,6 +30,7 @@
 ;;   (ed/did-key-from-seed seed-bytes)  ; "did:key:z6Mk…"
 ;;   (ed/verify-derivation seed-bytes)  ; true   (signer self-check, no vector needed)
 (ns ed25519.core
+  {:kotoba/export [b58 b58-decode did-key->pubkey did-key-from-pub did-key-from-seed did-key-from-seed-hex hexify private-from-seed pubkey-from-seed public-from-raw seed-hex->pubkey-hex sign unhex verify verify-derivation verify-did]}
   (:require [kotoba.lang.text :as str]
             #?(:cljs ["crypto" :as ncrypto]))
   #?(:clj (:import (java.security MessageDigest KeyFactory PrivateKey PublicKey Signature)

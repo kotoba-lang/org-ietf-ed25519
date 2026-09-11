@@ -36,6 +36,7 @@
   **Not constant-time.** Timing is a property of machine code and no portable
   Clojure controls it. Where a timing side channel is in scope, use the
   platform's Ed25519 and treat this as the reference it is checked against."
+  {:kotoba/export [clamp hex public-bytes public-key secret-key secret-key! seed-bytes sign signature-bytes unhex verify]}
   (:require [ed25519.edwards :as e]
             [ed25519.scalar :as sc]
             [sha2.sha512 :as sha512]))
