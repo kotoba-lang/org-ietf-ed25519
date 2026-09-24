@@ -25,6 +25,18 @@
                                             (ed/unhex jvm-sig-hex)))
    :b58-roundtrip (= "000007ff2a"
                      (ed/hexify (ed/b58-decode (ed/b58 (js/Uint8Array. #js [0 0 7 255 42])))))
+   ;; SIGNED input: on the kbb engine a Java-shaped byte[] is an Int8Array
+   ;; (0xff reads as -1). Every entry point must read it as the same bytes as
+   ;; the Uint8Array spelling; before the byte-ints mask hexify gave
+   ;; "-1007f-80" and b58 / did:key diverged.
+   :signed-hexify (= "ff007f80" (ed/hexify (.from js/Int8Array #js [-1 0 127 -128])))
+   :signed-b58 (= (ed/b58 (js/Uint8Array. #js [0 0 7 255 42]))
+                  (ed/b58 (.from js/Int8Array #js [0 0 7 -1 42])))
+   :signed-did-key (= (ed/did-key-from-seed seed)
+                      (ed/did-key-from-pub (.from js/Int8Array (ed/pubkey-from-seed seed))))
+   :signed-seed (let [u (js/Uint8Array. (into-array (range 200 232)))]
+                  (= (ed/hexify (ed/pubkey-from-seed u))
+                     (ed/hexify (ed/pubkey-from-seed (.from js/Int8Array u)))))
    :did-parse-roundtrip (= (ed/hexify (ed/pubkey-from-seed seed))
                            (ed/hexify (ed/did-key->pubkey (ed/did-key-from-seed seed))))})
 
