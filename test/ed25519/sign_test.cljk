@@ -2,7 +2,7 @@
   "RFC 8032 §7.1 verbatim. All four were independently reproduced with
   BouncyCastle 1.78.1 (`org.bouncycastle.math.ec.rfc8032.Ed25519`) before
   being written here."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [ed25519.scalar :as sc]
             [ed25519.sign :as ed]))
 
