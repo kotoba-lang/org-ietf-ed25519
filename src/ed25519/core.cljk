@@ -39,8 +39,14 @@
 ;; ── platform byte helpers ─────────────────────────────────────────────────────
 (defn- blen [b] #?(:clj (count b) :cljs (.-length b)))
 #?(:cljs (defn- byte-ints
-           "Uint8Array → vector of ints 0..255."
-           [b] (vec (array-seq b))))
+           "Bytes → vector of ints 0..255. The input may be a Uint8Array /
+           Buffer (this library's own output) or a SIGNED byte container: on
+           the kbb engine a Java-shaped byte[] (`byte-array`, `.getEncoded`,
+           `.getBytes`) is an Int8Array, whose 0xff reads as -1. Without the
+           mask `hexify` printed \"-1\" for 0xff and b58 / did:key divided
+           negative digits (measured 2026-09-24: 16 of 16 JCA-oracle cases and
+           hex-roundtrip red on kbb -M:test)."
+           [b] (mapv #(bit-and % 0xff) (array-seq b))))
 
 ;; ── field GF(2^255-19) (JVM-only — :cljs derives via node:crypto instead) ─────
 #?(:clj (def ^BigInteger P (.subtract (.pow (biginteger 2) 255) (biginteger 19))))
