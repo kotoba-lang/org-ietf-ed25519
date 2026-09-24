@@ -8,7 +8,7 @@
       conformant implementation across many random keys.
    2. Fixed regression vector — one (seed → pubkey) pair, itself JCA-verified, so a
       future refactor that breaks determinism fails even if the oracle were skipped."
-  (:require [kotoba.lang.text :as str]
+  (:require [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]
             [kotoba.test :refer [deftest is testing]]
             [ed25519.core :as ed])
   (:import (java.security KeyPairGenerator)))
@@ -71,12 +71,12 @@
     (dotimes [_ 8]
       (let [seed (byte-array (take-last 32 (seq (.getEncoded (.getPrivate (.generateKeyPair g))))))
             pub  (ed/pubkey-from-seed seed)
-            msg  (.getBytes "sign me" "UTF-8")
+            msg  (kbytes/utf8-bytes "sign me")
             sig  (ed/sign seed msg)]
         (is (= 64 (count sig)))
         (is (true? (ed/verify pub msg sig)))
         (is (true? (ed/verify-did (ed/did-key-from-seed seed) msg sig)))
-        (is (false? (ed/verify pub (.getBytes "tampered" "UTF-8") sig)))))))
+        (is (false? (ed/verify pub (kbytes/utf8-bytes "tampered") sig)))))))
 
 (deftest did-key-parse-roundtrip
   (let [seed (ed/unhex vec-seed)
