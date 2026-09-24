@@ -12,7 +12,7 @@
   111 bytes and the schedule differs on either side -- and the point decoding
   that only `verify` exercises, which is where a wrong square root would
   show."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [ed25519.sign :as ed])
   (:import (org.bouncycastle.math.ec.rfc8032 Ed25519)))
 
