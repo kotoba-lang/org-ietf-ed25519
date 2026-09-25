@@ -31,7 +31,7 @@
 ;;   (ed/verify-derivation seed-bytes)  ; true   (signer self-check, no vector needed)
 (ns ed25519.core
   {:kotoba/export [b58 b58-decode did-key->pubkey did-key-from-pub did-key-from-seed did-key-from-seed-hex hexify private-from-seed pubkey-from-seed public-from-raw seed-hex->pubkey-hex sign unhex verify verify-derivation verify-did]}
-  (:require [kotoba.lang.text :as str]
+  (:require [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]
             #?(:cljs ["crypto" :as ncrypto]))
   #?(:clj (:import (java.security MessageDigest KeyFactory PrivateKey PublicKey Signature)
                    (java.security.spec PKCS8EncodedKeySpec X509EncodedKeySpec))))
@@ -263,7 +263,7 @@
    the seed's true key without relying on any external test vector."
   [seed]
   #?(:clj
-     (let [msg (.getBytes "ed25519.core self-check" "UTF-8")
+     (let [msg (kbytes/utf8-bytes "ed25519.core self-check")
            s   (doto (Signature/getInstance "Ed25519") (.initSign (private-from-seed seed)))
            _   (.update s msg)
            sig (.sign s)

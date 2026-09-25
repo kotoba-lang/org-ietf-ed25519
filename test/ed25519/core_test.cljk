@@ -8,7 +8,7 @@
       conformant implementation across many random keys.
    2. Fixed regression vector — one (seed → pubkey) pair, itself JCA-verified, so a
       future refactor that breaks determinism fails even if the oracle were skipped."
-  (:require [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]
+  (:require [kotoba.lang.error :as kerror] [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]
             [kotoba.test :refer [deftest is testing]]
             [ed25519.core :as ed])
   (:import (java.security KeyPairGenerator)))
@@ -48,16 +48,16 @@
 
 ;; ── input validation ──────────────────────────────────────────────────────────
 (deftest seed-must-be-32-bytes
-  (is (thrown? clojure.lang.ExceptionInfo (ed/pubkey-from-seed (byte-array 31))))
-  (is (thrown? clojure.lang.ExceptionInfo (ed/pubkey-from-seed (byte-array 33)))))
+  (is (thrown? kerror/ExceptionInfo (ed/pubkey-from-seed (byte-array 31))))
+  (is (thrown? kerror/ExceptionInfo (ed/pubkey-from-seed (byte-array 33)))))
 
 (deftest unhex-rejects-odd-length-hex-instead-of-silently-truncating
-  (is (thrown? clojure.lang.ExceptionInfo (ed/unhex "abc")))
+  (is (thrown? kerror/ExceptionInfo (ed/unhex "abc")))
   (testing "the concretely dangerous case: a 65-char (one-too-many) seed-hex
             would otherwise silently truncate to exactly 32 bytes -- the
             RIGHT length, the WRONG bytes -- evading pubkey-from-seed's
             own 32-byte length guard entirely"
-    (is (thrown? clojure.lang.ExceptionInfo
+    (is (thrown? kerror/ExceptionInfo
                  (ed/unhex (str vec-seed "0"))))))
 
 ;; ── encodings round-trip ──────────────────────────────────────────────────────
@@ -83,8 +83,8 @@
         pub  (ed/pubkey-from-seed seed)
         did  (ed/did-key-from-pub pub)]
     (is (= (seq pub) (seq (ed/did-key->pubkey did))) "did:key → pubkey is the inverse of pubkey → did:key")
-    (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey "did:key:zNotEd25519")))
-    (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey "not-a-did")))))
+    (is (thrown? kerror/ExceptionInfo (ed/did-key->pubkey "did:key:zNotEd25519")))
+    (is (thrown? kerror/ExceptionInfo (ed/did-key->pubkey "not-a-did")))))
 
 (deftest did-key-rejects-wrong-length-multicodec-payload
   ;; An Ed25519 did:key multicodec payload is always exactly 34 bytes
@@ -93,14 +93,14 @@
   ;; return whatever bytes happen to follow the prefix.
   (testing "prefix with zero bytes of key material must not be accepted"
     (let [truncated-did (str "did:key:z" (ed/b58 (byte-array [(unchecked-byte 0xed) (unchecked-byte 0x01)])))]
-      (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey truncated-did)))))
+      (is (thrown? kerror/ExceptionInfo (ed/did-key->pubkey truncated-did)))))
   (testing "a valid payload with trailing garbage bytes must not be accepted"
     (let [pub (ed/pubkey-from-seed (ed/unhex vec-seed))
           oversized (byte-array (concat [(unchecked-byte 0xed) (unchecked-byte 0x01)]
                                         (seq pub)
                                         [(unchecked-byte 0xaa) (unchecked-byte 0xbb)]))
           oversized-did (str "did:key:z" (ed/b58 oversized))]
-      (is (thrown? clojure.lang.ExceptionInfo (ed/did-key->pubkey oversized-did))))))
+      (is (thrown? kerror/ExceptionInfo (ed/did-key->pubkey oversized-did))))))
 
 (deftest base58-encode-decode-inverse
   (let [b (byte-array (map unchecked-byte [0 0 1 2 3 250 255]))]
