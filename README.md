@@ -88,6 +88,58 @@ Adding BouncyCastle (or `tink`, or a JNI binding) works on the JVM but defeats t
 point on babashka/GraalVM native images and bloats the dependency graph for what is,
 mathematically, one scalar multiplication. This is ~120 lines of stdlib Clojure.
 
+## Selfhost (amu, no host crypto)
+
+`kotoba/ed25519/selfhost.kotoba` is SHA-512 (FIPS 180-4) and Ed25519
+(RFC 8032) in the Amu selfhost seed subset. A loaderless static image built
+by the amu root compiler can use it to derive a public key from a seed, sign
+and verify, with no JVM, no Node.js and no host crypto. Linear JUN-326 is the
+tracking issue. The itonami node management plane uses it to sign its L1
+intent and L2 observations (com-junkawasaki/root ADR-2610222140).
+
+- The arithmetic is TweetNaCl's:
+  - a field element is 16 limbs of 16 bits in a `:vector-i64`;
+  - scalars are reduced on byte limbs;
+  - every product fits an i64.
+- `verify?` also checks S < L, which RFC 8032 requires and TweetNaCl does not.
+- Bytes are `:vector-i64` of 0..255; `hex-bytes` reads lowercase hex.
+- `test-*` check the FIPS 180-4 SHA-512 vectors and the RFC 8032 §7.1 vectors
+  (public keys and signatures). The vectors were checked with RFC 8032's own
+  §6 reference code.
+- The tests also refuse altered signatures, messages and keys, and the
+  malleable S + L.
+
+Gate (no JVM, Node.js, nbb or babashka):
+
+```bash
+AMU=../amu; G=$(mktemp -d)   # G must be under a path podman can mount
+cp "$AMU/seed/bootstrap/aarch64-linux-static-root.elf" "$G/root.elf"
+F=kotoba/ed25519/selfhost.kotoba
+{ echo '(ns ed25519-gate (:export [main]))'
+  tail -n +$(( $(grep -n 'test-sha512 test-public test-sign test-verify\]))' $F | cut -d: -f1) + 1 )) $F
+  cat <<'EOF'
+(defn main [] :i64
+  (+ (if (test-sha512) 1 0) (+ (if (test-public) 2 0)
+  (+ (if (test-sign) 4 0) (if (test-verify) 8 0)))))
+EOF
+} > "$G/gate.kotoba"
+podman run --rm --platform linux/arm64 --network none -e KEXE_CAP_RESOURCES_35="$G" \
+  -v "$G:$G" -w "$G" docker.io/library/python:3.12-alpine sh -c \
+  "./root.elf compile $G/gate.kotoba --target aarch64-linux --output $G/gate.elf --format static \
+   && chmod +x gate.elf && KEXE_STRUCTURED_REPORT=1 ./gate.elf"
+#   → {:status :ok :result 15 ...}      (15 = all four test-* true)
+```
+
+Measured on 2026-10-23 with the root of amu `1585cb48` (sha256 `98d4bcb7…b774`):
+`:result 15`. Two negative controls:
+
+- Folding the field product with 37 in place of 38 gives `1`: only SHA-512
+  still passes.
+- Dropping the S < L check gives `7`: the S + L case is then accepted.
+
+The receipt is `docs/evidence/selfhost-gate-20261023.edn`. The `.cljk`
+library is unchanged and does not call this module.
+
 ## License
 
 Apache-2.0.
