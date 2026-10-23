@@ -9,9 +9,18 @@
 ;;   sha512             bytes -> 64 bytes
 ;;   public-from-seed   32-byte seed -> 32-byte public key (RFC 8032 5.1.5)
 ;;   sign               seed, message -> 64-byte signature (5.1.6)
+;;   sign-into          the same signature written into the caller's 64-byte
+;;                      vector; 0, or -1 (nothing written) for another size
 ;;   verify?            public key, message, signature -> bool (5.1.7, with
 ;;                      the S < L check TweetNaCl leaves out)
 ;;   hex-bytes          lowercase hex -> bytes (for vectors and callers)
+;;
+;; Memory: a static image frees nothing by itself, and one verify allocates
+;; about 8 MiB. verify? runs inside (arena-scope ..), which releases all of
+;; it when the bool comes back, and sign-into does the same around sign, so a
+;; long-lived image can verify and sign without growing. sign and
+;; public-from-seed return vectors, which cannot leave a scope: use them
+;; only for one-off work, or inside the caller's own scope.
 ;;
 ;; Bytes are :vector-i64 of 0..255. Signing is not constant time beyond what
 ;; TweetNaCl's select gives; this module is for node identity in static
@@ -19,8 +28,8 @@
 ;;
 ;; Written in the Amu selfhost seed subset; README "Selfhost" has the gate.
 (ns ed25519.selfhost
-  (:export [sha512 public-from-seed sign verify? hex-bytes bytes=?
-            test-sha512 test-public test-sign test-verify]))
+  (:export [sha512 public-from-seed sign sign-into verify? hex-bytes bytes=?
+            test-sha512 test-public test-sign test-verify test-sign-into]))
 
 ;; ---------------------------------------------------------------------------
 ;; Bytes
@@ -391,13 +400,22 @@
     (bcat rr (mod-l x))))
 
 (defn verify? [pk :vector-i64 m :vector-i64 sig :vector-i64] :bool
-  (if (or (not (= (vector-count pk) 32)) (not (= (vector-count sig) 64))) false
-    (let [s (bslice sig 32 32) q (pt-unpackneg pk)]
-      (if (or (not (below-l? s)) (= (vector-count q) 0)) false
-        (let [rr (bslice sig 0 32)
-              h (reduce64 (sha512 (bcat (bcat rr pk) m)))
-              p (pt-add (pt-mul q h) (pt-mul (pt-base) s))]
-          (bytes=? (pt-pack p) rr))))))
+  (arena-scope
+    (if (or (not (= (vector-count pk) 32)) (not (= (vector-count sig) 64))) false
+      (let [s (bslice sig 32 32) q (pt-unpackneg pk)]
+        (if (or (not (below-l? s)) (= (vector-count q) 0)) false
+          (let [rr (bslice sig 0 32)
+                h (reduce64 (sha512 (bcat (bcat rr pk) m)))
+                p (pt-add (pt-mul q h) (pt-mul (pt-base) s))]
+            (bytes=? (pt-pack p) rr)))))))
+
+;; sign, with every intermediate released: only the 64 bytes written into out
+;; (allocated by the caller, outside the scope) survive
+(defn sign-into [out :vector-i64 seed :vector-i64 m :vector-i64] :i64
+  (if (not (= (vector-count out) 64)) -1
+    (arena-scope
+      (let [s (sign seed m)]
+        (loop [i 0] (if (= i 64) 0 (let [z (vector-assoc! out i (vector-at s i))] (recur (inc i)))))))))
 
 ;; ---------------------------------------------------------------------------
 ;; test-* : zero-arity, true when every assertion holds. Vectors: FIPS 180-4
@@ -431,6 +449,14 @@
            (bytes=? (sign (seed2) (hex-bytes "72")) (sig2))
            (bytes=? (sign (seed3) (hex-bytes "af82")) (sig3)))
     true false))
+
+;; one caller-owned vector, reused: each signature overwrites the last
+(defn test-sign-into [] :bool
+  (let [out (bzero 64)]
+    (and (= (sign-into out (seed1) (bzero 0)) 0) (bytes=? out (sig1))
+         (= (sign-into out (seed2) (hex-bytes "72")) 0) (bytes=? out (sig2))
+         (= (sign-into out (seed3) (hex-bytes "af82")) 0) (bytes=? out (sig3))
+         (= (sign-into (bzero 63) (seed1) (bzero 0)) -1))))
 
 ;; flip one bit of a copy
 (defn flipped [v :vector-i64 i :i64] :vector-i64

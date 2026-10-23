@@ -102,6 +102,13 @@ intent and L2 observations (com-junkawasaki/root ADR-2610222140).
   - scalars are reduced on byte limbs;
   - every product fits an i64.
 - `verify?` also checks S < L, which RFC 8032 requires and TweetNaCl does not.
+- `sign-into` writes the signature into a 64-byte vector the caller owns.
+- **Memory.** A static image frees nothing by itself, and one verify
+  allocates about 8 MiB. `verify?` runs inside `(arena-scope ..)`, which
+  releases all of it when the bool comes back. `sign-into` does the same
+  around `sign`. A long-lived image can therefore verify and sign without
+  growing. `sign` and `public-from-seed` return vectors, which cannot leave a
+  scope, so use them for one-off work.
 - Bytes are `:vector-i64` of 0..255; `hex-bytes` reads lowercase hex.
 - `test-*` check the FIPS 180-4 SHA-512 vectors and the RFC 8032 §7.1 vectors
   (public keys and signatures). The vectors were checked with RFC 8032's own
@@ -116,28 +123,52 @@ AMU=../amu; G=$(mktemp -d)   # G must be under a path podman can mount
 cp "$AMU/seed/bootstrap/aarch64-linux-static-root.elf" "$G/root.elf"
 F=kotoba/ed25519/selfhost.kotoba
 { echo '(ns ed25519-gate (:export [main]))'
-  tail -n +$(( $(grep -n 'test-sha512 test-public test-sign test-verify\]))' $F | cut -d: -f1) + 1 )) $F
+  tail -n +$(( $(grep -n 'test-sha512 test-public test-sign test-verify test-sign-into\]))' $F | cut -d: -f1) + 1 )) $F
   cat <<'EOF'
 (defn main [] :i64
   (+ (if (test-sha512) 1 0) (+ (if (test-public) 2 0)
-  (+ (if (test-sign) 4 0) (if (test-verify) 8 0)))))
+  (+ (if (test-sign) 4 0) (+ (if (test-verify) 8 0) (if (test-sign-into) 16 0))))))
 EOF
 } > "$G/gate.kotoba"
 podman run --rm --platform linux/arm64 --network none -e KEXE_CAP_RESOURCES_35="$G" \
   -v "$G:$G" -w "$G" docker.io/library/python:3.12-alpine sh -c \
   "./root.elf compile $G/gate.kotoba --target aarch64-linux --output $G/gate.elf --format static \
    && chmod +x gate.elf && KEXE_STRUCTURED_REPORT=1 ./gate.elf"
-#   → {:status :ok :result 15 ...}      (15 = all four test-* true)
+#   → {:status :ok :result 31 ...}      (31 = all five test-* true)
 ```
 
-Measured on 2026-10-23 with the root of amu `1585cb48` (sha256 `98d4bcb7…b774`):
-`:result 15`. Two negative controls:
+The first measurement was on 2026-10-23 with the root of amu `1585cb48`
+(sha256 `98d4bcb7…b774`), before `sign-into`: `:result 15`. Remeasured the
+same day with the root of amu `457042ab` (sha256 `1739f52f…682e`):
+`:result 31`. Two negative controls:
 
 - Folding the field product with 37 in place of 38 gives `1`: only SHA-512
   still passes.
-- Dropping the S < L check gives `7`: the S + L case is then accepted.
+- Dropping the S < L check gives `23` (`7` before `sign-into`): the S + L
+  case is then accepted.
 
-The receipt is `docs/evidence/selfhost-gate-20261023.edn`. The `.cljk`
+**Memory gate.** Use the same body with this `main`, which does 32 verifies
+and 8 signs into one vector:
+
+```clojure
+(defn main [] :i64
+  (let [out (bzero 64)
+        v (loop [i 0 ok 0] (if (= i 32) ok (recur (inc i) (if (verify? (pk1) (bzero 0) (sig1)) (inc ok) ok))))
+        s (loop [i 0 ok 0] (if (= i 8) ok (let [z (sign-into out (seed1) (bzero 0))] (recur (inc i) (if (bytes=? out (sig1)) (inc ok) ok)))))]
+    (+ v s)))
+```
+
+Run it under `busybox time -v` in `alpine:3`. It reports `:result 40` and a
+maximum resident set of 8,508 KiB. The controls replace one
+`(arena-scope` with `(do`, using sed on `^  (arena-scope$` and
+`^    (arena-scope$`:
+- with `verify?` unscoped, the peak is 273,852 KiB;
+- with `sign-into` unscoped, it is 66,364 KiB.
+
+The results are the same in both controls. Only the memory differs.
+
+The receipts are `docs/evidence/selfhost-gate-20261023.edn` (the first
+measurement) and `docs/evidence/selfhost-memory-20261023.edn`. The `.cljk`
 library is unchanged and does not call this module.
 
 ## License
